@@ -1,4 +1,5 @@
 root = "H+tmp/bench"
+cooldown_sec = 10
 
 [[dragonflies]]
 
@@ -9,6 +10,9 @@ proactor_threads = "1"
 logtostderr = ""
 
 bind = "0.0.0.0"
+
+# ROOT+ means start at the dynamic root the runner creates
+dir = "ROOT+data"
 
 [[benchmarks]]
 
@@ -33,6 +37,8 @@ distinct-client-seed = ""
 show-config = ""
 hide-histogram = ""
 
+json-out-file = "ROOT+mt.json"
+
 [[benchmarks]]
 
 server = "127.0.0.1"
@@ -52,3 +58,5 @@ pipeline = "32"
 distinct-client-seed = ""
 show-config = ""
 hide-histogram = ""
+
+json-out-file = "ROOT+mt.json"

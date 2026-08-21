@@ -5,17 +5,19 @@ use redis::TypedCommands;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env::home_dir;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 use std::{fs, thread};
 
 const MT: &str = "memtier_benchmark";
+const ROOT_PREFIX: &str = "R+";
+const HOME_PREFIX: &str = "H+";
 
 fn resolve_path(path: &str) -> Result<String> {
-    if path.starts_with("H+") {
+    if path.starts_with(HOME_PREFIX) {
         let home = home_dir().ok_or(anyhow!("no home dir for user"))?;
-        let rest = path.strip_prefix("H+").unwrap();
+        let rest = path.strip_prefix(HOME_PREFIX).unwrap();
         return Ok(home.join(rest).into_string().unwrap());
     }
     Ok(path.to_owned())
@@ -24,6 +26,7 @@ fn resolve_path(path: &str) -> Result<String> {
 #[derive(Serialize, Deserialize, Debug)]
 struct RunConfig {
     root: PathBuf,
+    cooldown_sec: u64,
     dragonflies: Vec<HashMap<String, String>>,
     benchmarks: Vec<HashMap<String, String>>,
 }
@@ -32,24 +35,20 @@ impl RunConfig {
     fn initialize(&mut self) -> Result<()> {
         let root = resolve_path(self.root.to_str().unwrap())?;
         self.root = PathBuf::from_str(&root)?;
-        if !self.root.exists() {
-            fs::create_dir_all(&self.root)?;
-        }
+        fs::create_dir_all(&self.root)?;
         Ok(())
     }
 
-    fn determine_root(&self, dragonfly_id: usize, benchmark_id: usize) -> Result<String> {
+    fn determine_root(&self, dragonfly_id: usize, benchmark_id: usize) -> Result<PathBuf> {
         Ok(self
             .root
             .join("dragonfly")
             .join(dragonfly_id.to_string())
-            .join(benchmark_id.to_string())
-            .into_string()
-            .unwrap())
+            .join(benchmark_id.to_string()))
     }
 }
 
-fn build_args(map: &HashMap<String, String>) -> Vec<String> {
+fn build_args(root: &Path, map: &HashMap<String, String>) -> Vec<String> {
     let mut args = Vec::new();
     for (k, v) in map {
         if k == "PATH" {
@@ -57,6 +56,10 @@ fn build_args(map: &HashMap<String, String>) -> Vec<String> {
         }
         if v.is_empty() {
             args.push(format!("--{k}"));
+        } else if v.starts_with(ROOT_PREFIX) {
+            let s = v.strip_prefix(ROOT_PREFIX).unwrap();
+            let resolved = root.join(s).into_string().unwrap();
+            args.push(format!("--{k}={resolved}"))
         } else {
             args.push(format!("--{k}={v}"))
         }
@@ -125,13 +128,13 @@ fn wait_ready() -> Result<bool> {
 
 fn run_cycle(config: RunConfig) -> Result<()> {
     for (dragonfly_id, dragonfly) in config.dragonflies.iter().enumerate() {
-        let mut dragonfly_args = build_args(dragonfly);
         let path = resolve_path(&dragonfly["PATH"])?;
 
         for (benchmark_id, benchmark) in config.benchmarks.iter().enumerate() {
             let root = config.determine_root(dragonfly_id, benchmark_id)?;
-            dragonfly_args.push(format!("--dir={root}"));
+            fs::create_dir_all(&root)?;
 
+            let dragonfly_args = build_args(&root, dragonfly);
             println!("starting dragonfly with args: {dragonfly_args:?}");
 
             let dragonfly = Process::launch(&path, dragonfly_args.as_slice())?;
@@ -142,12 +145,17 @@ fn run_cycle(config: RunConfig) -> Result<()> {
 
             println!("process is ready, starting benchmark");
 
-            let benchmark_args = build_args(benchmark);
+            let benchmark_args = build_args(&root, benchmark);
             Process::run(benchmark_args.as_slice())?;
 
             let dragonfly_out = dragonfly.kill()?;
-            println!("process stopped: {}", dragonfly_out);
-            dragonfly_args.pop();
+            println!("process stopped\n===================================================");
+            println!("{dragonfly_out}\n===================================================");
+
+            if benchmark_id != config.benchmarks.len() - 1 {
+                println!("cooldown sleep: {} seconds", config.cooldown_sec);
+                thread::sleep(Duration::from_secs(config.cooldown_sec));
+            }
         }
     }
 
