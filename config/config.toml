@@ -1,0 +1,54 @@
+root = "H+tmp/bench"
+
+[[dragonflies]]
+
+# path to dragonfly, H+ means start at home directory
+PATH = "H+dev/cc/dragonfly/build-dbg/dragonfly"
+
+proactor_threads = "1"
+logtostderr = ""
+
+bind = "0.0.0.0"
+
+[[benchmarks]]
+
+server = "127.0.0.1"
+port = "6379"
+protocol = "redis"
+
+threads = "4"
+clients = "25"
+
+requests = "allkeys"
+key-minimum = "1"
+key-maximum = "1000000"
+key-pattern = "P:P"
+
+ratio = "1:0"
+data-size = "256"
+
+pipeline = "1"
+
+distinct-client-seed = ""
+show-config = ""
+hide-histogram = ""
+
+[[benchmarks]]
+
+server = "127.0.0.1"
+port = "6379"
+protocol = "redis"
+threads = "4"
+clients = "25"
+requests = "allkeys"
+key-minimum = "1"
+key-maximum = "1000000"
+key-pattern = "P:P"
+ratio = "1:0"
+data-size = "256"
+
+pipeline = "32"
+
+distinct-client-seed = ""
+show-config = ""
+hide-histogram = ""

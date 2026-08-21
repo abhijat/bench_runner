@@ -1,0 +1,11 @@
+[package]
+name = "bench_runner"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+duct = "1.1.1"
+redis = "1.6.0"
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.1.4"
