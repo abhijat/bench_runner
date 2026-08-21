@@ -1,5 +1,6 @@
 use crate::process::BenchmarkRun;
 use anyhow::Result;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -42,24 +43,20 @@ impl ProcessConfig {
 pub(crate) struct RunConfig {
     root: PathBuf,
     pub(crate) cooldown_sec: u64,
+    n_runs: u64,
+
     pub(crate) dragonflies: Vec<ProcessConfig>,
     pub(crate) benchmarks: Vec<ProcessConfig>,
 }
 
 impl RunConfig {
-    fn initialize(&mut self) -> Result<()> {
-        fs::create_dir_all(&self.root)?;
-        Ok(())
-    }
+    pub(crate) fn run(&mut self) -> Result<()> {
+        for n in 0..self.n_runs {
+            let now = Utc::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+            let root_for_run = self.root.join("runs").join(now).join(n.to_string());
 
-    pub(crate) fn make_run_root(&self, dragonfly_id: &str, benchmark_id: &str) -> Result<PathBuf> {
-        Ok(self.root.join(dragonfly_id).join(benchmark_id))
-    }
+            println!("starting run: {n} in {root_for_run:?}");
 
-    pub(crate) fn run(&mut self, count: usize) -> Result<()> {
-        self.initialize()?;
-        for n in 0..count {
-            let root_for_run = self.root.join("runs").join(n.to_string());
             for benchmark_config in &self.benchmarks {
                 let mut benchmark_run = BenchmarkRun::new(
                     root_for_run.clone(),
@@ -75,14 +72,14 @@ impl RunConfig {
 
 pub(crate) fn load_config() -> Result<RunConfig> {
     let data = fs::read_to_string("config/config.toml")?;
-    let mut parsed: RunConfig = toml::from_str(&data)?;
-    parsed.initialize()?;
+    let parsed = toml::from_str(&data)?;
     Ok(parsed)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
 
     #[test]
     fn convert_from_toml() {

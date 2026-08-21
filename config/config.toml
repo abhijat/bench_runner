@@ -1,5 +1,6 @@
 root = "/home/abhijat/tmp/bench"
 cooldown_sec = 10
+n_runs = 3
 
 [[dragonflies]]
 # path to dragonfly, H+ means start at home directory

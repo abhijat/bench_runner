@@ -2,12 +2,11 @@ use crate::config::ProcessConfig;
 use anyhow::Result;
 use duct::unix::HandleExt;
 use duct::{Handle, cmd};
+use rand::{Rng, thread_rng};
 use redis::TypedCommands;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use std::{fs, thread};
-
-const MT: &str = "memtier_benchmark";
 
 pub(crate) struct Process {
     handle: Handle,
@@ -76,8 +75,9 @@ impl BenchmarkRun {
     pub(crate) fn new(
         root: PathBuf,
         benchmark_config: ProcessConfig,
-        dragonfly_configs: Vec<ProcessConfig>,
+        mut dragonfly_configs: Vec<ProcessConfig>,
     ) -> Self {
+        thread_rng().shuffle(&mut dragonfly_configs);
         Self {
             root,
             benchmark_config,

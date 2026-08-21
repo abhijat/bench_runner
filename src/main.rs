@@ -5,6 +5,6 @@ mod process;
 
 fn main() -> Result<()> {
     let mut config = config::load_config()?;
-    config.run(1)?;
+    config.run()?;
     Ok(())
 }
