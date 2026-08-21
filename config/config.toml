@@ -1,11 +1,12 @@
-root = "H+tmp/bench"
+root = "/home/abhijat/tmp/bench"
 cooldown_sec = 10
 
 [[dragonflies]]
-
 # path to dragonfly, H+ means start at home directory
-PATH = "H+dev/cc/dragonfly/build-dbg/dragonfly"
+path = "/home/abhijat/dev/cc/dragonfly/build-dbg/dragonfly"
+id = "normal-build"
 
+[dragonflies.args]
 proactor_threads = "1"
 logtostderr = ""
 
@@ -15,7 +16,10 @@ bind = "0.0.0.0"
 dir = "ROOT+data"
 
 [[benchmarks]]
+path = "memtier_benchmark"
+id = "write-only-256-1"
 
+[benchmarks.args]
 server = "127.0.0.1"
 port = "6379"
 protocol = "redis"
@@ -40,7 +44,10 @@ hide-histogram = ""
 json-out-file = "ROOT+mt.json"
 
 [[benchmarks]]
+path = "memtier_benchmark"
+id = "write-only-256-32"
 
+[benchmarks.args]
 server = "127.0.0.1"
 port = "6379"
 protocol = "redis"
