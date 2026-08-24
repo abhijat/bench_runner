@@ -36,12 +36,8 @@ impl Process {
 
 impl Drop for Process {
     fn drop(&mut self) {
-        match self.kill() {
-            Ok(output) => {
-                println!("process stopped\n===================================================");
-                println!("{output}\n===================================================");
-            }
-            Err(err) => println!("{}", err),
+        if let Err(err) = self.kill() {
+            println!("{err}");
         }
     }
 }
@@ -73,6 +69,17 @@ pub(crate) struct BenchmarkRun {
     dragonfly_configs: Vec<ProcessConfig>,
 }
 
+#[derive(Debug)]
+pub(crate) struct BenchmarkRunResult {
+    pub(crate) run_id: u64,
+    pub(crate) dragonfly_id: String,
+    pub(crate) benchmark_id: String,
+    results_path: PathBuf,
+    dragonfly_config_file: PathBuf,
+    benchmark_config_file: PathBuf,
+    pub(crate) benchmark_output_file: PathBuf,
+}
+
 impl BenchmarkRun {
     pub(crate) fn new(
         root: PathBuf,
@@ -89,14 +96,15 @@ impl BenchmarkRun {
         }
     }
 
-    pub(crate) fn run(&mut self) -> Result<()> {
-        for dragonfly_config in &mut self.dragonfly_configs {
+    pub(crate) fn run(&mut self, run_id: u64) -> Result<Vec<BenchmarkRunResult>> {
+        let mut results = vec![];
+        let len = self.dragonfly_configs.len();
+        for (n, dragonfly_config) in self.dragonfly_configs.iter_mut().enumerate() {
             let root = self
                 .root
                 .join(&self.benchmark_config.id)
                 .join(&dragonfly_config.id);
 
-            println!("creating root: {:?}", root);
             fs::create_dir_all(&root)?;
 
             dragonfly_config.resolve_paths(&root)?;
@@ -108,7 +116,7 @@ impl BenchmarkRun {
 
             if !wait_ready()? {
                 println!("could not start dragonfly!");
-                return Ok(());
+                return Ok(results);
             }
 
             let mut benchmark_config = self.benchmark_config.clone();
@@ -127,15 +135,29 @@ impl BenchmarkRun {
             }
 
             let dragonfly_json = serde_json::to_string(dragonfly_config)?;
-            fs::write(root.join("dragonfly_config.json"), dragonfly_json)?;
+            let dragonfly_config_json = "dragonfly_config.json";
+            fs::write(root.join(dragonfly_config_json), dragonfly_json)?;
 
             let benchmark_json = serde_json::to_string(&benchmark_config)?;
-            fs::write(root.join("benchmark_config.json"), benchmark_json)?;
+            let benchmark_config_path = "benchmark_config.json";
+            fs::write(root.join(benchmark_config_path), benchmark_json)?;
 
-            thread::sleep(Duration::from_secs(self.cooldown_sec));
+            if (n < len - 1) {
+                thread::sleep(Duration::from_secs(self.cooldown_sec));
+            }
+
+            results.push(BenchmarkRunResult {
+                run_id,
+                dragonfly_id: dragonfly_config.id.clone(),
+                benchmark_id: self.benchmark_config.id.clone(),
+                results_path: root.clone(),
+                dragonfly_config_file: root.join(dragonfly_config_json),
+                benchmark_config_file: root.join(benchmark_config_path),
+                benchmark_output_file: root.join(benchmark_config.get("json-out-file").unwrap()),
+            });
         }
 
-        Ok(())
+        Ok(results)
     }
 }
 
@@ -150,11 +172,8 @@ fn format_args((k, v): (&String, &String)) -> String {
 impl ProcessConfig {
     fn resolve_paths(&mut self, root: &Path) -> Result<()> {
         for v in self.args.values_mut() {
-            if v.starts_with("ROOT+") {
-                *v = root
-                    .join(v.strip_prefix("ROOT+").unwrap())
-                    .into_string()
-                    .unwrap();
+            if let Some(x) = v.strip_prefix("ROOT+") {
+                *v = root.join(x).into_string().unwrap();
             }
         }
         Ok(())

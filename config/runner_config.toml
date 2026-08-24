@@ -1,6 +1,6 @@
 root = "/home/abhijat/tmp/bench"
 cooldown_sec = 3
-n_runs = 3
+n_runs = 2
 
 [[dragonflies]]
 # path to dragonfly, H+ means start at home directory
@@ -10,7 +10,19 @@ id = "normal-build"
 [dragonflies.args]
 proactor_threads = "1"
 logtostderr = ""
+bind = "0.0.0.0"
 
+# ROOT+ means start at the dynamic root the runner creates
+dir = "ROOT+data"
+
+[[dragonflies]]
+# path to dragonfly, H+ means start at home directory
+path = "/home/abhijat/dev/cc/dragonfly/build-dbg/dragonfly"
+id = "super-fast-build"
+
+[dragonflies.args]
+proactor_threads = "1"
+logtostderr = ""
 bind = "0.0.0.0"
 
 # ROOT+ means start at the dynamic root the runner creates

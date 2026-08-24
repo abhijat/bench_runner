@@ -1,7 +1,8 @@
-use crate::process::{BenchmarkRun, ProcessConfig};
+use crate::process::{BenchmarkRun, BenchmarkRunResult, ProcessConfig};
 use anyhow::Result;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -16,13 +17,11 @@ pub(crate) struct BenchRunner {
 }
 
 impl BenchRunner {
-    pub(crate) fn run(&mut self) -> Result<()> {
+    pub(crate) fn run(&mut self) -> Result<HashMap<String, Vec<BenchmarkRunResult>>> {
         let now = Utc::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+        let mut results: HashMap<String, Vec<BenchmarkRunResult>> = HashMap::new();
         for n in 0..self.n_runs {
             let root_for_run = self.root.join("runs").join(&now).join(n.to_string());
-
-            println!("starting run: {n} in {root_for_run:?}");
-
             for benchmark_config in &self.benchmarks {
                 let mut benchmark_run = BenchmarkRun::new(
                     root_for_run.clone(),
@@ -30,10 +29,14 @@ impl BenchRunner {
                     benchmark_config.clone(),
                     self.dragonflies.clone(),
                 );
-                benchmark_run.run()?;
+                let r = benchmark_run.run(n)?;
+                results
+                    .entry(benchmark_config.id.clone())
+                    .or_default()
+                    .extend(r.into_iter());
             }
         }
-        Ok(())
+        Ok(results)
     }
 }
 
