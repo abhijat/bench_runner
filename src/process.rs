@@ -1,10 +1,11 @@
-use crate::config::ProcessConfig;
 use anyhow::Result;
 use duct::unix::HandleExt;
 use duct::{Handle, cmd};
 use rand::{Rng, thread_rng};
 use redis::TypedCommands;
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use std::{fs, thread};
 
@@ -67,6 +68,7 @@ fn wait_ready() -> Result<bool> {
 
 pub(crate) struct BenchmarkRun {
     root: PathBuf,
+    cooldown_sec: u64,
     benchmark_config: ProcessConfig,
     dragonfly_configs: Vec<ProcessConfig>,
 }
@@ -74,12 +76,14 @@ pub(crate) struct BenchmarkRun {
 impl BenchmarkRun {
     pub(crate) fn new(
         root: PathBuf,
+        sleep_sec: u64,
         benchmark_config: ProcessConfig,
         mut dragonfly_configs: Vec<ProcessConfig>,
     ) -> Self {
         thread_rng().shuffle(&mut dragonfly_configs);
         Self {
             root,
+            cooldown_sec: sleep_sec,
             benchmark_config,
             dragonfly_configs,
         }
@@ -100,7 +104,7 @@ impl BenchmarkRun {
             let process_path = dragonfly_config.path.to_string_lossy();
 
             println!("starting {process_path} with args: {:?}", args);
-            let _process = Process::launch(&process_path, &args)?;
+            let process = Process::launch(&process_path, &args)?;
 
             if !wait_ready()? {
                 println!("could not start dragonfly!");
@@ -115,8 +119,53 @@ impl BenchmarkRun {
 
             println!("starting {benchmark_path} with args: {:?}", benchmark_args);
             run_process(&benchmark_path, &benchmark_args)?;
+
+            drop(process);
+            if let Some(data_dir) = dragonfly_config.get("dir") {
+                println!("removing data path: {data_dir}");
+                fs::remove_dir_all(data_dir)?;
+            }
+
+            thread::sleep(Duration::from_secs(self.cooldown_sec));
         }
 
         Ok(())
     }
+}
+
+fn format_args((k, v): (&String, &String)) -> String {
+    if v.is_empty() {
+        format!("--{}", k)
+    } else {
+        format!("--{}={}", k, v)
+    }
+}
+
+impl ProcessConfig {
+    fn resolve_paths(&mut self, root: &Path) -> Result<()> {
+        for v in self.args.values_mut() {
+            if v.starts_with("ROOT+") {
+                *v = root
+                    .join(v.strip_prefix("ROOT+").unwrap())
+                    .into_string()
+                    .unwrap();
+            }
+        }
+        Ok(())
+    }
+
+    fn build_args(&self) -> Vec<String> {
+        self.args.iter().map(format_args).collect()
+    }
+
+    fn get(&self, key: &str) -> Option<&String> {
+        self.args.get(key)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct ProcessConfig {
+    pub(crate) path: PathBuf,
+    pub(crate) id: String,
+    args: HashMap<String, String>,
 }

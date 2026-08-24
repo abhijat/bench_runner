@@ -1,10 +1,8 @@
 use anyhow::Result;
 
-mod config;
+mod bench_runner;
 mod process;
 
 fn main() -> Result<()> {
-    let mut config = config::load_config()?;
-    config.run()?;
-    Ok(())
+    bench_runner::initialize()?.run()
 }

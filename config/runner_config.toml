@@ -1,5 +1,5 @@
 root = "/home/abhijat/tmp/bench"
-cooldown_sec = 10
+cooldown_sec = 3
 n_runs = 3
 
 [[dragonflies]]

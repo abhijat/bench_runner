@@ -1,0 +1,61 @@
+use crate::process::{BenchmarkRun, ProcessConfig};
+use anyhow::Result;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub(crate) struct BenchRunner {
+    root: PathBuf,
+    pub(crate) cooldown_sec: u64,
+    n_runs: u64,
+
+    pub(crate) dragonflies: Vec<ProcessConfig>,
+    pub(crate) benchmarks: Vec<ProcessConfig>,
+}
+
+impl BenchRunner {
+    pub(crate) fn run(&mut self) -> Result<()> {
+        let now = Utc::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+        for n in 0..self.n_runs {
+            let root_for_run = self.root.join("runs").join(&now).join(n.to_string());
+
+            println!("starting run: {n} in {root_for_run:?}");
+
+            for benchmark_config in &self.benchmarks {
+                let mut benchmark_run = BenchmarkRun::new(
+                    root_for_run.clone(),
+                    self.cooldown_sec,
+                    benchmark_config.clone(),
+                    self.dragonflies.clone(),
+                );
+                benchmark_run.run()?;
+            }
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn initialize() -> Result<BenchRunner> {
+    // TODO take cli arg here
+    let data = fs::read_to_string("config/runner_config.toml")?;
+    let parsed = toml::from_str(&data)?;
+    Ok(parsed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn convert_from_toml() {
+        let s = fs::read_to_string("config/runner_config.toml").unwrap();
+        let config: BenchRunner = toml::from_str(&s).unwrap();
+        assert_eq!(config.dragonflies.len(), 1);
+        assert_eq!(config.dragonflies[0].id, "normal-build");
+        assert_eq!(config.benchmarks.len(), 2);
+        assert_eq!(config.benchmarks[0].id, "write-only-256-1");
+        assert_eq!(config.benchmarks[1].id, "write-only-256-32");
+    }
+}
