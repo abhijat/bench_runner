@@ -7,7 +7,7 @@ mod process;
 
 fn main() -> Result<()> {
     let results = bench_runner::initialize()?.run()?;
-    println!("\n");
+    println!();
     report_results(results)?;
     Ok(())
 }
