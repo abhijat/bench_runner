@@ -126,6 +126,12 @@ impl BenchmarkRun {
                 fs::remove_dir_all(data_dir)?;
             }
 
+            let dragonfly_json = serde_json::to_string(dragonfly_config)?;
+            fs::write(root.join("dragonfly_config.json"), dragonfly_json)?;
+
+            let benchmark_json = serde_json::to_string(&benchmark_config)?;
+            fs::write(root.join("benchmark_config.json"), benchmark_json)?;
+
             thread::sleep(Duration::from_secs(self.cooldown_sec));
         }
 

@@ -39,7 +39,6 @@ data-size = "256"
 pipeline = "1"
 
 distinct-client-seed = ""
-show-config = ""
 hide-histogram = ""
 
 json-out-file = "ROOT+mt.json"
@@ -64,7 +63,6 @@ data-size = "256"
 pipeline = "32"
 
 distinct-client-seed = ""
-show-config = ""
 hide-histogram = ""
 
 json-out-file = "ROOT+mt.json"
