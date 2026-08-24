@@ -4,7 +4,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct BenchRunner {
@@ -40,9 +40,8 @@ impl BenchRunner {
     }
 }
 
-pub(crate) fn initialize() -> Result<BenchRunner> {
-    // TODO take cli arg here
-    let data = fs::read_to_string("config/runner_config.toml")?;
+pub(crate) fn initialize(p: &Path) -> Result<BenchRunner> {
+    let data = fs::read_to_string(p)?;
     let parsed = toml::from_str(&data)?;
     Ok(parsed)
 }
