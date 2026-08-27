@@ -54,7 +54,7 @@ mod tests {
     fn convert_from_toml() {
         let s = fs::read_to_string("config/runner_config.toml").unwrap();
         let config: BenchRunner = toml::from_str(&s).unwrap();
-        assert_eq!(config.dragonflies.len(), 1);
+        assert_eq!(config.dragonflies.len(), 2);
         assert_eq!(config.dragonflies[0].id, "normal-build");
         assert_eq!(config.benchmarks.len(), 2);
         assert_eq!(config.benchmarks[0].id, "write-only-256-1");

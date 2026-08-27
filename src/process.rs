@@ -9,12 +9,12 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use std::{fs, thread};
 
-pub(crate) struct Process {
+struct Process {
     handle: Handle,
 }
 
 impl Process {
-    pub(crate) fn launch(program: &str, args: &[String]) -> Result<Self> {
+    fn launch(program: &str, args: &[String]) -> Result<Self> {
         let command = cmd(program, args);
         let handle = command
             .stderr_to_stdout()
@@ -24,13 +24,18 @@ impl Process {
         Ok(Self { handle })
     }
 
-    pub(crate) fn kill(&self) -> Result<String> {
+    fn kill(&self) -> Result<String> {
         self.handle.send_signal(15)?;
         let output = &self.handle.wait()?.stdout;
         let output = String::from_utf8_lossy(output.as_slice())
             .trim()
             .to_string();
         Ok(output)
+    }
+
+    fn one_shot(program: &str, args: &[String]) -> Result<()> {
+        cmd(program, args).stderr_to_stdout().run()?;
+        Ok(())
     }
 }
 
@@ -40,11 +45,6 @@ impl Drop for Process {
             println!("{err}");
         }
     }
-}
-
-pub(crate) fn run_process(program: &str, args: &[String]) -> Result<()> {
-    cmd(program, args).stderr_to_stdout().run()?;
-    Ok(())
 }
 
 fn wait_ready() -> Result<bool> {
@@ -108,7 +108,7 @@ impl BenchmarkRun {
             fs::create_dir_all(&root)?;
 
             dragonfly_config.resolve_paths(&root)?;
-            let args = dragonfly_config.build_args();
+            let args = dragonfly_config.build_process_args();
             let process_path = dragonfly_config.path.to_string_lossy();
 
             println!("starting {process_path} with args: {:?}", args);
@@ -123,10 +123,21 @@ impl BenchmarkRun {
             benchmark_config.resolve_paths(&root)?;
 
             let benchmark_path = benchmark_config.path.to_string_lossy();
-            let benchmark_args = benchmark_config.build_args();
+
+            if benchmark_config.warmup.is_some() {
+                let warmup_args = benchmark_config.build_warmup_args();
+                println!(
+                    "starting warmup {benchmark_path} with args: {:?}",
+                    warmup_args
+                );
+                Process::one_shot(&benchmark_path, &warmup_args)?;
+                thread::sleep(Duration::from_secs(2));
+            }
+
+            let benchmark_args = benchmark_config.build_process_args();
 
             println!("starting {benchmark_path} with args: {:?}", benchmark_args);
-            run_process(&benchmark_path, &benchmark_args)?;
+            Process::one_shot(&benchmark_path, &benchmark_args)?;
 
             drop(process);
             if let Some(data_dir) = dragonfly_config.get("dir") {
@@ -142,7 +153,7 @@ impl BenchmarkRun {
             let benchmark_config_path = "benchmark_config.json";
             fs::write(root.join(benchmark_config_path), benchmark_json)?;
 
-            if (n < len - 1) {
+            if n < len - 1 {
                 thread::sleep(Duration::from_secs(self.cooldown_sec));
             }
 
@@ -172,15 +183,23 @@ fn format_args((k, v): (&String, &String)) -> String {
 impl ProcessConfig {
     fn resolve_paths(&mut self, root: &Path) -> Result<()> {
         for v in self.args.values_mut() {
-            if let Some(x) = v.strip_prefix("ROOT+") {
-                *v = root.join(x).into_string().unwrap();
+            if let Some(suffix) = v.strip_prefix("ROOT+") {
+                *v = root.join(suffix).into_string().unwrap();
             }
         }
         Ok(())
     }
 
-    fn build_args(&self) -> Vec<String> {
-        self.args.iter().map(format_args).collect()
+    fn build_args(&self, m: &HashMap<String, String>) -> Vec<String> {
+        m.iter().map(format_args).collect()
+    }
+
+    fn build_warmup_args(&self) -> Vec<String> {
+        self.build_args(self.warmup.as_ref().unwrap())
+    }
+
+    fn build_process_args(&self) -> Vec<String> {
+        self.build_args(&self.args)
     }
 
     fn get(&self, key: &str) -> Option<&String> {
@@ -193,4 +212,5 @@ pub(crate) struct ProcessConfig {
     pub(crate) path: PathBuf,
     pub(crate) id: String,
     args: HashMap<String, String>,
+    warmup: Option<HashMap<String, String>>,
 }

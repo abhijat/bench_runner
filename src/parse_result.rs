@@ -103,6 +103,7 @@ impl Range {
 
 #[derive(Debug, Default, Tabled)]
 struct BuildSummary {
+    #[tabled(rename = "build")]
     build_name: String,
     trials: u64,
     #[tabled(rename = "median ops/sec", format = "{:.2}")]

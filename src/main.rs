@@ -9,7 +9,7 @@ mod process;
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "config/runner_config.toml")]
     config_file: PathBuf,
 }
 
