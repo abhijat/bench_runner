@@ -1,5 +1,10 @@
+# all output files stored in hierarchy below this root, by timestamped dir
+# e.g. /home/abhijat/tmp/bench/runs/2026-08-27_06-37-55/1/write-only-256-32/super-fast-build
+# will have benchmark_config.json dragonfly_config.json mt.json
 root = "/home/abhijat/tmp/bench"
+# between runs
 cooldown_sec = 1
+# runs per benchmark per server config
 n_runs = 2
 
 [[dragonflies]]
@@ -8,15 +13,15 @@ path = "/home/abhijat/dev/cc/dragonfly/build-dbg/dragonfly"
 id = "normal-build"
 
 [dragonflies.args]
+# any arg with non blank value is converted to "--foo=bar"
 proactor_threads = "1"
+# any arg with blank value is converted to "--foo"
 logtostderr = ""
 bind = "0.0.0.0"
-
 # ROOT+ means start at the dynamic root the runner creates
 dir = "ROOT+data"
 
 [[dragonflies]]
-# path to dragonfly, H+ means start at home directory
 path = "/home/abhijat/dev/cc/dragonfly/build-dbg/dragonfly"
 id = "super-fast-build"
 
@@ -24,8 +29,6 @@ id = "super-fast-build"
 proactor_threads = "1"
 logtostderr = ""
 bind = "0.0.0.0"
-
-# ROOT+ means start at the dynamic root the runner creates
 dir = "ROOT+data"
 
 [[benchmarks]]
@@ -36,23 +39,17 @@ id = "write-only-256-1"
 server = "127.0.0.1"
 port = "6379"
 protocol = "redis"
-
 threads = "4"
 clients = "25"
-
 key-minimum = "1"
 key-maximum = "10000"
 requests = "allkeys"
 key-pattern = "P:P"
-
 ratio = "1:0"
 data-size = "256"
-
 pipeline = "1"
-
 distinct-client-seed = ""
 hide-histogram = ""
-
 json-out-file = "ROOT+mt.json"
 
 [[benchmarks]]
@@ -71,14 +68,13 @@ requests = "allkeys"
 key-pattern = "P:P"
 ratio = "1:0"
 data-size = "256"
-
 pipeline = "32"
-
 distinct-client-seed = ""
 hide-histogram = ""
 
 json-out-file = "ROOT+mt.json"
 
+# warmup is run before actual process, if it exists (it is optional, use for benchmark warmup)
 [benchmarks.warmup]
 server = "127.0.0.1"
 port = "6379"
