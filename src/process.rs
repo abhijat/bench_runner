@@ -1,10 +1,11 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use duct::unix::HandleExt;
 use duct::{Handle, cmd};
 use rand::{Rng, thread_rng};
 use redis::TypedCommands;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use std::{fs, thread};
@@ -73,10 +74,6 @@ pub(crate) struct BenchmarkRun {
 pub(crate) struct BenchmarkRunResult {
     pub(crate) run_id: u64,
     pub(crate) dragonfly_id: String,
-    pub(crate) benchmark_id: String,
-    results_path: PathBuf,
-    dragonfly_config_file: PathBuf,
-    benchmark_config_file: PathBuf,
     pub(crate) benchmark_output_file: PathBuf,
 }
 
@@ -160,10 +157,6 @@ impl BenchmarkRun {
             results.push(BenchmarkRunResult {
                 run_id,
                 dragonfly_id: dragonfly_config.id.clone(),
-                benchmark_id: self.benchmark_config.id.clone(),
-                results_path: root.clone(),
-                dragonfly_config_file: root.join(dragonfly_config_json),
-                benchmark_config_file: root.join(benchmark_config_path),
                 benchmark_output_file: root.join(benchmark_config.get("json-out-file").unwrap()),
             });
         }
@@ -178,6 +171,14 @@ fn format_args((k, v): (&String, &String)) -> String {
     } else {
         format!("--{}={}", k, v)
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct ProcessConfig {
+    pub(crate) path: PathBuf,
+    pub(crate) id: String,
+    args: HashMap<String, String>,
+    warmup: Option<HashMap<String, String>>,
 }
 
 impl ProcessConfig {
@@ -205,12 +206,19 @@ impl ProcessConfig {
     fn get(&self, key: &str) -> Option<&String> {
         self.args.get(key)
     }
-}
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub(crate) struct ProcessConfig {
-    pub(crate) path: PathBuf,
-    pub(crate) id: String,
-    args: HashMap<String, String>,
-    warmup: Option<HashMap<String, String>>,
+    pub(crate) fn validate(&self) -> Result<()> {
+        let path = self.path.to_string_lossy();
+
+        let metadata = self.path.metadata()?;
+        if !metadata.is_file() {
+            return Err(anyhow!("{} is not a file", path));
+        }
+
+        if metadata.permissions().mode() & 0o111 == 0 {
+            Err(anyhow!("{} is not an executable", path))
+        } else {
+            Ok(())
+        }
+    }
 }

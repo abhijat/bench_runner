@@ -38,11 +38,19 @@ impl BenchRunner {
         }
         Ok(results)
     }
+
+    fn validate(&self) -> Result<()> {
+        self.dragonflies
+            .iter()
+            .chain(self.benchmarks.iter())
+            .try_for_each(ProcessConfig::validate)
+    }
 }
 
 pub(crate) fn initialize(p: &Path) -> Result<BenchRunner> {
     let data = fs::read_to_string(p)?;
-    let parsed = toml::from_str(&data)?;
+    let parsed: BenchRunner = toml::from_str(&data)?;
+    parsed.validate()?;
     Ok(parsed)
 }
 
