@@ -208,17 +208,27 @@ impl ProcessConfig {
     }
 
     pub(crate) fn validate(&self) -> Result<()> {
-        let path = self.path.to_string_lossy();
-
-        let metadata = self.path.metadata()?;
-        if !metadata.is_file() {
-            return Err(anyhow!("{} is not a file", path));
-        }
-
-        if metadata.permissions().mode() & 0o111 == 0 {
-            Err(anyhow!("{} is not an executable", path))
+        let path = self.path.to_str().unwrap();
+        if self.path.components().count() == 1 && !self.path.is_absolute() {
+            anyhow::ensure!(
+                cmd!("which", path)
+                    .stderr_to_stdout()
+                    .stdout_capture()
+                    .run()
+                    .is_ok(),
+                "command {path} not found in PATH"
+            );
         } else {
-            Ok(())
+            let metadata = self
+                .path
+                .metadata()
+                .map_err(|e| anyhow!("failed to get metadata for {path}: {e}"))?;
+            anyhow::ensure!(metadata.is_file(), "{path} is not a file");
+            anyhow::ensure!(
+                metadata.permissions().mode() & 0o111 != 0,
+                "{path} is not an executable"
+            );
         }
+        Ok(())
     }
 }
